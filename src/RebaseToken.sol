@@ -3,6 +3,7 @@
 pragma solidity ^0.8.19;
 
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 /**
  * @author  Josh Regnart
@@ -13,8 +14,11 @@ import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol"
             Each user will have their own interest rate that is the global interest arte at the time of depositing.
  */
 
-contract RebaseToken is ERC20 {
-    error RebaseToken__interestRateCanOnlyDecrease(uint256 currentInterestRate, uint256 newInterestRate);
+contract RebaseToken is ERC20, Ownable {
+    error RebaseToken__interestRateCanOnlyDecrease(
+        uint256 currentInterestRate,
+        uint256 newInterestRate
+    );
 
     uint256 private s_interestRate = 5e18;
     uint256 private constant PRECISION_FACTOR = 1e18;
@@ -23,9 +27,9 @@ contract RebaseToken is ERC20 {
 
     event InterestRateSet(uint256 newInterestRate);
 
-    constructor() ERC20("Rebase Token", "RBT") {}
+    constructor() ERC20("Rebase Token", "RBT") Ownable(msg.sender) {}
 
-    function setInterestRate(uint256 newInterestRate) external {
+    function setInterestRate(uint256 newInterestRate) external onlyOwner {
         if (newInterestRate < s_interestRate) {
             revert RebaseToken__interestRateCanOnlyDecrease(
                 s_interestRate,
@@ -36,10 +40,22 @@ contract RebaseToken is ERC20 {
         emit InterestRateSet(newInterestRate);
     }
 
+    function principleBalanceOf(address _user) external view returns (uint256) {
+        return super.balanceOf(_user);
+    }
+
     function mint(address _to, uint256 _amount) external {
         _mintAccruedInterest(_to);
         s_userInterestRate[_to] = s_interestRate;
         _mint(_to, _amount);
+    }
+
+    function burn(address _from, uint256 _amount) external {
+        if (_amount == type(uint256).max) {
+            _amount = balanceOf(_from);
+        }
+        _mintAccruedInterest(_from);
+        _burn(_from, _amount);
     }
 
     function balanceOf(address _user) public view override returns (uint256) {
@@ -47,6 +63,37 @@ contract RebaseToken is ERC20 {
             (super.balanceOf(_user) *
                 _calculatedUserAccumulatedInterestSinceLastUpdate(_user)) /
             PRECISION_FACTOR;
+    }
+
+    function transfer(
+        address _recipient,
+        uint256 _amount
+    ) public override returns (bool) {
+        _mintAccruedInterest(msg.sender);
+        _mintAccruedInterest(_recipient);
+        if (_amount == type(uint256).max) {
+            _amount = balanceOf(msg.sender);
+        }
+        if (balanceOf(_recipient) == 0) {
+            s_userInterestRate[_recipient] = s_userInterestRate[msg.sender];
+        }
+        return super.transfer(_recipient, _amount);
+    }
+
+    function transferFrom(
+        address _sender,
+        address _recipient,
+        uint256 _amount
+    ) public override returns (bool) {
+        _mintAccruedInterest(msg.sender);
+        _mintAccruedInterest(_recipient);
+        if (_amount == type(uint256).max) {
+            _amount = balanceOf(msg.sender);
+        }
+        if (balanceOf(_recipient) == 0) {
+            s_userInterestRate[_recipient] = s_userInterestRate[msg.sender];
+        }
+        return super.transferFrom(_sender, _recipient, _amount);
     }
 
     function _calculatedUserAccumulatedInterestSinceLastUpdate(
@@ -60,10 +107,19 @@ contract RebaseToken is ERC20 {
     }
 
     function _mintAccruedInterest(address _user) internal {
+        uint256 previousPrincipleBalance = super.balanceOf(_user);
+        uint256 currentBalance = balanceOf(_user);
+        uint256 balanceIncrease = currentBalance - previousPrincipleBalance;
+
         s_usersLastUpdatedTimeStamp[_user] = block.timestamp;
+        _mint(_user, balanceIncrease);
     }
 
     function getUserInterestRate(address user) external view returns (uint256) {
         return s_userInterestRate[user];
+    }
+
+    function getInterestRate() external view returns (uint256) {
+        return s_interestRate;
     }
 }
