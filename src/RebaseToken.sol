@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 
 import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {AccessControl} from "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
 
 /**
  * @author  Josh Regnart
@@ -14,13 +15,15 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
             Each user will have their own interest rate that is the global interest arte at the time of depositing.
  */
 
-contract RebaseToken is ERC20, Ownable {
+contract RebaseToken is ERC20, Ownable, AccessControl {
     error RebaseToken__interestRateCanOnlyDecrease(
         uint256 currentInterestRate,
         uint256 newInterestRate
     );
 
     uint256 private s_interestRate = 5e18;
+    bytes32 private constant MINT_AND_BURN_ROLE =
+        keccak256("MINT_AND_BURN_ROLE");
     uint256 private constant PRECISION_FACTOR = 1e18;
     mapping(address => uint256) private s_userInterestRate;
     mapping(address => uint256) private s_usersLastUpdatedTimeStamp;
@@ -28,6 +31,10 @@ contract RebaseToken is ERC20, Ownable {
     event InterestRateSet(uint256 newInterestRate);
 
     constructor() ERC20("Rebase Token", "RBT") Ownable(msg.sender) {}
+
+    function grantMintAndBurnRole(address _account) external onlyOwner {
+        _grantRole(MINT_AND_BURN_ROLE, _account);
+    }
 
     function setInterestRate(uint256 newInterestRate) external onlyOwner {
         if (newInterestRate < s_interestRate) {
@@ -44,13 +51,19 @@ contract RebaseToken is ERC20, Ownable {
         return super.balanceOf(_user);
     }
 
-    function mint(address _to, uint256 _amount) external {
+    function mint(
+        address _to,
+        uint256 _amount
+    ) external onlyRole(MINT_AND_BURN_ROLE) {
         _mintAccruedInterest(_to);
         s_userInterestRate[_to] = s_interestRate;
         _mint(_to, _amount);
     }
 
-    function burn(address _from, uint256 _amount) external {
+    function burn(
+        address _from,
+        uint256 _amount
+    ) external onlyRole(MINT_AND_BURN_ROLE) {
         if (_amount == type(uint256).max) {
             _amount = balanceOf(_from);
         }
