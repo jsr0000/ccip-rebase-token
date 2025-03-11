@@ -8,6 +8,7 @@ import {Vault} from "src/Vault.sol";
 import {IRebaseToken} from "src/Interfaces/IRebaseToken.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {IAccessControl} from "lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
+// import {VmSafe} from "lib/forge-std/src/Vm.sol";
 
 contract RebaseTokenTest is Test {
     RebaseToken private rebaseToken;
@@ -135,5 +136,37 @@ contract RebaseTokenTest is Test {
             bytes4(IAccessControl.AccessControlUnauthorizedAccount.selector)
         );
         rebaseToken.burn(user, 100);
+    }
+
+    function testGetPrincipleAmount(uint256 amount) public {
+        amount = bound(amount, 1e5, type(uint96).max);
+        vm.deal(user, amount);
+        vm.prank(user);
+        vault.deposit{value: amount}();
+        assertEq(rebaseToken.principleBalanceOf(user), amount);
+
+        vm.warp(block.timestamp + 1 hours);
+        assertEq(rebaseToken.principleBalanceOf(user), amount);
+    }
+
+    function testGetRebaseTokenAddress() public {
+        assertEq(vault.getRebaseTokenAddress(), address(rebaseToken));
+    }
+
+    function testInterestCanOnlyDecrease(uint256 newInterestRate) public {
+        uint256 initialInterestRate = rebaseToken.getInterestRate();
+        newInterestRate = bound(
+            newInterestRate,
+            initialInterestRate,
+            type(uint256).max
+        );
+        vm.prank(owner);
+        vm.expectPartialRevert(
+            bytes4(
+                RebaseToken.RebaseToken__interestRateCanOnlyDecrease.selector
+            )
+        );
+        rebaseToken.setInterestRate(newInterestRate);
+        assertEq(rebaseToken.getInterestRate(), initialInterestRate);
     }
 }
