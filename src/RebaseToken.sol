@@ -37,7 +37,7 @@ contract RebaseToken is ERC20, Ownable, AccessControl {
     }
 
     function setInterestRate(uint256 newInterestRate) external onlyOwner {
-        if (newInterestRate < s_interestRate) {
+        if (newInterestRate > s_interestRate) {
             revert RebaseToken__interestRateCanOnlyDecrease(
                 s_interestRate,
                 newInterestRate
@@ -64,16 +64,22 @@ contract RebaseToken is ERC20, Ownable, AccessControl {
         address _from,
         uint256 _amount
     ) external onlyRole(MINT_AND_BURN_ROLE) {
-        if (_amount == type(uint256).max) {
-            _amount = balanceOf(_from);
-        }
+        // if (_amount == type(uint256).max) {
+        //     _amount = balanceOf(_from);
+        // }
         _mintAccruedInterest(_from);
         _burn(_from, _amount);
     }
 
     function balanceOf(address _user) public view override returns (uint256) {
+        //current principal balance of the user
+        uint256 currentPrincipalBalance = super.balanceOf(_user);
+        if (currentPrincipalBalance == 0) {
+            return 0;
+        }
+        // shares * current accumulated interest for that user since their interest was last minted to them.
         return
-            (super.balanceOf(_user) *
+            (currentPrincipalBalance *
                 _calculatedUserAccumulatedInterestSinceLastUpdate(_user)) /
             PRECISION_FACTOR;
     }
@@ -111,12 +117,13 @@ contract RebaseToken is ERC20, Ownable, AccessControl {
 
     function _calculatedUserAccumulatedInterestSinceLastUpdate(
         address _user
-    ) internal view returns (uint256 linnearInterest) {
-        uint256 timeElapsed = block.timestamp -
+    ) internal view returns (uint256 linearInterest) {
+        uint256 timeDifference = block.timestamp -
             s_usersLastUpdatedTimeStamp[_user];
-        linnearInterest =
-            PRECISION_FACTOR +
-            (s_userInterestRate[_user] * timeElapsed);
+        // represents the linear growth over time = 1 + (interest rate * time)
+        linearInterest =
+            (s_userInterestRate[_user] * timeDifference) +
+            PRECISION_FACTOR;
     }
 
     function _mintAccruedInterest(address _user) internal {
@@ -124,8 +131,8 @@ contract RebaseToken is ERC20, Ownable, AccessControl {
         uint256 currentBalance = balanceOf(_user);
         uint256 balanceIncrease = currentBalance - previousPrincipleBalance;
 
-        s_usersLastUpdatedTimeStamp[_user] = block.timestamp;
         _mint(_user, balanceIncrease);
+        s_usersLastUpdatedTimeStamp[_user] = block.timestamp;
     }
 
     function getUserInterestRate(address user) external view returns (uint256) {
