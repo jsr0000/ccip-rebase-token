@@ -11,23 +11,27 @@ import {IRebaseToken} from "src/Interfaces/IRebaseToken.sol";
 
 contract RebaseTokenPool is TokenPool {
     constructor(
-        IERC20 _token,
-        address[] memory _allowList,
-        address _rmnProxy,
-        address _router
-    ) TokenPool(_token, 18, _allowList, _rnmProxy, _router) {}
+        IERC20 token,
+        address[] memory allowList,
+        address rmnProxy,
+        address router
+    ) TokenPool(token, allowList, rmnProxy, router) {}
 
     function lockOrBurn(
         Pool.LockOrBurnInV1 calldata lockOrBurnIn
     ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut) {
         _validateLockOrBurn(lockOrBurnIn);
-        address originalSender = abi.decode(
-            lockOrBurnIn.originalSender,
-            (address)
-        );
+
+        // address originalSender = abi.decode(
+        //     lockOrBurnIn.originalSender,
+        //     (address)
+        // );
+
         uint256 userInterestRate = IRebaseToken(address(i_token))
-            .getUserInterestRate(originalSender);
+            .getUserInterestRate(lockOrBurnIn.originalSender);
+
         IRebaseToken(address(i_token)).burn(address(this), lockOrBurnIn.amount);
+
         lockOrBurnOut = Pool.LockOrBurnOutV1({
             destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
             destPoolData: abi.encode(userInterestRate)
@@ -38,15 +42,18 @@ contract RebaseTokenPool is TokenPool {
         Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
     ) external returns (Pool.ReleaseOrMintOutV1 memory) {
         _validateReleaseOrMint(releaseOrMintIn);
-        uint256 userInterestRate = abi.encode(
+
+        uint256 userInterestRate = abi.decode(
             releaseOrMintIn.sourcePoolData,
             (uint256)
         );
+
         IRebaseToken(address(i_token)).mint(
             releaseOrMintIn.receiver,
             releaseOrMintIn.amount,
             userInterestRate
         );
+
         return
             Pool.ReleaseOrMintOutV1({
                 destinationAmount: releaseOrMintIn.amount

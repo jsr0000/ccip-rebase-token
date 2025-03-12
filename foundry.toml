@@ -2,5 +2,6 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+rpc_endpoints = { sepolia-eth = "https://eth-sepolia.g.alchemy.com/v2/qcB7c0AzCb5bw_0l3Abs1hwJ9HFt5Rur", arb-sepolia = "https://sepolia-rollup.arbitrum.io/rpc"}
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

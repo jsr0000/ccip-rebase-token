@@ -131,7 +131,7 @@ contract RebaseTokenTest is Test {
         vm.expectPartialRevert(
             bytes4(IAccessControl.AccessControlUnauthorizedAccount.selector)
         );
-        rebaseToken.mint(user, 100);
+        rebaseToken.mint(user, 100, rebaseToken.getInterestRate());
         vm.expectPartialRevert(
             bytes4(IAccessControl.AccessControlUnauthorizedAccount.selector)
         );
