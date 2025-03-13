@@ -2,8 +2,8 @@
 
 pragma solidity ^0.8.24;
 
-// import {IRebaseToken} from "src/Interfaces/IRebaseToken.sol";
-// import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {IRebaseToken} from "src/Interfaces/IRebaseToken.sol";
+import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {TokenPool} from "lib/ccip/contracts/src/v0.8/ccip/pools/TokenPool.sol";
 import {Pool} from "lib/ccip/contracts/src/v0.8/ccip/libraries/Pool.sol";
 import {IERC20} from "lib/ccip/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
@@ -19,7 +19,7 @@ contract RebaseTokenPool is TokenPool {
 
     function lockOrBurn(
         Pool.LockOrBurnInV1 calldata lockOrBurnIn
-    ) external returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut) {
+    ) external virtual override returns (Pool.LockOrBurnOutV1 memory lockOrBurnOut) {
         _validateLockOrBurn(lockOrBurnIn);
 
         // address originalSender = abi.decode(
@@ -42,14 +42,14 @@ contract RebaseTokenPool is TokenPool {
         Pool.ReleaseOrMintInV1 calldata releaseOrMintIn
     ) external returns (Pool.ReleaseOrMintOutV1 memory) {
         _validateReleaseOrMint(releaseOrMintIn);
-
+        address receiver = releaseOrMintIn.receiver;
         uint256 userInterestRate = abi.decode(
             releaseOrMintIn.sourcePoolData,
             (uint256)
         );
 
         IRebaseToken(address(i_token)).mint(
-            releaseOrMintIn.receiver,
+            receiver,
             releaseOrMintIn.amount,
             userInterestRate
         );

@@ -13,8 +13,8 @@ import {RegistryModuleOwnerCustom} from "lib/ccip/contracts/src/v0.8/ccip/tokenA
 import {TokenAdminRegistry} from "lib/ccip/contracts/src/v0.8/ccip/tokenAdminRegistry/TokenAdminRegistry.sol";
 import {TokenPool} from "lib/chainlink-local/lib/ccip/contracts/src/v0.8/ccip/pools/TokenPool.sol";
 import {RateLimiter} from "lib/chainlink-local/lib/ccip/contracts/src/v0.8/ccip/libraries/RateLimiter.sol";
-import {Client} from "lib/chainlink-local/lib/ccip/contracts/src/v0.8/ccip/libraries/Client.sol";
-import {IRouterClient} from "lib/chainlink-local/lib/ccip/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
+import {Client} from "lib/ccip/contracts/src/v0.8/ccip/libraries/Client.sol";
+import {IRouterClient} from "lib/ccip/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 
 contract CrossChainTest is Test {
     address public owner = makeAddr("owner");
@@ -153,7 +153,10 @@ contract CrossChainTest is Test {
             data: "", // We don't need any data for this example
             tokenAmounts: tokenToSendDetails, // this needs to be of type EVMTokenAmount[] as you could send multiple tokens
             extraArgs: Client._argsToBytes(
-                Client.EVMExtraArgsV1({gasLimit: 100_000})
+                Client.EVMExtraArgsV2({
+                    gasLimit: 500_000,
+                    allowOutOfOrderExecution: false
+                })
             ), // We don't need any extra args for this example
             feeToken: localNetworkDetails.linkAddress // The token used to pay for the fee
         });
@@ -241,6 +244,17 @@ contract CrossChainTest is Test {
             arbSepoliaNetworkDetails,
             sepoliaToken,
             arbSepoliaToken
+        );
+        vm.selectFork(arbSepoliaFork);
+        vm.warp(block.timestamp + 20 minutes);
+        bridgeTokens(
+            arbSepoliaToken.balanceOf(user),
+            arbSepoliaFork,
+            sepoliaFork,
+            arbSepoliaNetworkDetails,
+            sepoliaNetworkDetails,
+            arbSepoliaToken,
+            sepoliaToken
         );
     }
 }
